@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Todas las chuches · Chuches.shop</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍬</text></svg>">
+</head>
+<body>
+  <div id="site-header"></div>
+
+  <div class="page-head">
+    <div class="container">
+      <div class="breadcrumb"><a href="/">Inicio</a> / <span id="crumb">Todas las chuches</span></div>
+      <h1 id="page-title">🍭 Todas las chuches</h1>
+      <p id="page-sub">Golosinas para todos los gustos: bolsas, tarros, cajas y packs.</p>
+    </div>
+  </div>
+
+  <main class="container shop-layout">
+    <aside class="filters">
+      <div>
+        <h3>Categorías</h3>
+        <ul class="filter-list" id="cat-filters">
+          <li><button data-cat="" class="active">Todos <span class="count" id="count-all"></span></button></li>
+        </ul>
+      </div>
+      <div>
+        <h3>Precio</h3>
+        <div class="price-inputs">
+          <div>
+            <label for="min-price">Mín.</label>
+            <input type="number" id="min-price" min="0" step="0.5" placeholder="0 €">
+          </div>
+          <div>
+            <label for="max-price">Máx.</label>
+            <input type="number" id="max-price" min="0" step="0.5" placeholder="99 €">
+          </div>
+        </div>
+      </div>
+      <div>
+        <h3>Especiales</h3>
+        <ul class="filter-list" id="badge-filters">
+          <li><button data-badge="">Todos</button></li>
+          <li><button data-badge="nuevo">✨ Novedades</button></li>
+          <li><button data-badge="top">🏆 Top ventas</button></li>
+          <li><button data-badge="hot">🔥 En redes</button></li>
+        </ul>
+      </div>
+      <button class="btn btn-ghost btn-sm btn-block" id="clear-filters">Limpiar filtros</button>
+    </aside>
+
+    <section>
+      <div class="shop-toolbar">
+        <span class="result-count" id="result-count">Cargando…</span>
+        <select id="sort-select" aria-label="Ordenar">
+          <option value="popular">Más populares</option>
+          <option value="price-asc">Precio: de menor a mayor</option>
+          <option value="price-desc">Precio: de mayor a menor</option>
+          <option value="newest">Novedades primero</option>
+          <option value="name">Nombre A → Z</option>
+        </select>
+      </div>
+
+      <div class="product-grid" id="grid"></div>
+
+      <div class="empty-state" id="empty" hidden>
+        <span class="big">🔍</span>
+        <h2>No hemos encontrado chuches</h2>
+        <p>Prueba con otro término o quita algún filtro.</p>
+        <button class="btn" id="empty-reset">Ver todos los productos</button>
+      </div>
+
+      <nav class="pagination" id="pagination" aria-label="Paginación"></nav>
+    </section>
+  </main>
+
+  <div id="site-footer"></div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/layout.js"></script>
+  <script>
+    const { escapeHtml, productCard, bindCardActions, toast } = window.layout;
+    const params = new URLSearchParams(location.search);
+
+    const state = {
+      q: params.get('q') || '',
+      category: params.get('category') || '',
+      badge: params.get('badge') || '',
+      minPrice: '',
+      maxPrice: '',
+      sort: params.get('sort') || 'popular',
+      page: 1,
+    };
+
+    const grid = document.getElementById('grid');
+    const empty = document.getElementById('empty');
+    const paginationNav = document.getElementById('pagination');
+    bindCardActions(grid);
+
+    function syncUrl() {
+      const p = new URLSearchParams();
+      if (state.q) p.set('q', state.q);
+      if (state.category) p.set('category', state.category);
+      if (state.badge) p.set('badge', state.badge);
+      if (state.sort !== 'popular') p.set('sort', state.sort);
+      if (state.page > 1) p.set('page', state.page);
+      history.replaceState(null, '', '/tienda' + (p.toString() ? '?' + p : ''));
+    }
+
+    async function loadCategories() {
+      const [{ data: cats }, counts] = await Promise.all([
+        api.get('/categories'),
+        api.get('/products?limit=1'),
+      ]);
+      const list = document.getElementById('cat-filters');
+      document.getElementById('count-all').textContent = counts.pagination.total;
+      cats.forEach((c) => {
+        const li = document.createElement('li');
+        li.innerHTML = `<button data-cat="${c.slug}">${c.emoji} ${escapeHtml(c.name)} <span class="count">${c.productCount}</span></button>`;
+        list.appendChild(li);
+      });
+      list.addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-cat]');
+        if (!btn) return;
+        state.category = btn.dataset.cat;
+        state.page = 1;
+        [...list.querySelectorAll('button')].forEach((b) => b.classList.toggle('active', b === btn));
+        syncUrl();
+        window.layout.setActiveNav(state.category);
+        load();
+      });
+      if (state.category) {
+        list.querySelector(`button[data-cat="${state.category}"]`)?.click();
+      }
+    }
+
+    document.getElementById('badge-filters').addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-badge]');
+      if (!btn) return;
+      state.badge = btn.dataset.badge;
+      state.page = 1;
+      [...e.currentTarget.querySelectorAll('button')].forEach((b) => b.classList.toggle('active', b === btn));
+      syncUrl();
+      load();
+    });
+
+    let priceTimer;
+    ['min-price', 'max-price'].forEach((id) =>
+      document.getElementById(id).addEventListener('input', (e) => {
+        clearTimeout(priceTimer);
+        priceTimer = setTimeout(() => {
+          state.minPrice = document.getElementById('min-price').value;
+          state.maxPrice = document.getElementById('max-price').value;
+          state.page = 1;
+          load();
+        }, 350);
+      })
+    );
+
+    document.getElementById('sort-select').addEventListener('change', (e) => {
+      state.sort = e.target.value;
+      state.page = 1;
+      syncUrl();
+      load();
+    });
+
+    function resetFilters() {
+      Object.assign(state, { q: '', category: '', badge: '', minPrice: '', maxPrice: '', page: 1 });
+      document.getElementById('min-price').value = '';
+      document.getElementById('max-price').value = '';
+      document.querySelectorAll('#badge-filters button').forEach((b, i) => b.classList.toggle('active', i === 0));
+      document.querySelectorAll('#cat-filters button').forEach((b, i) => b.classList.toggle('active', i === 0));
+      syncUrl();
+      window.layout.setActiveNav('');
+      load();
+    }
+    document.getElementById('clear-filters').addEventListener('click', resetFilters);
+    document.getElementById('empty-reset').addEventListener('click', resetFilters);
+
+    async function load() {
+      try {
+        const query = new URLSearchParams({
+          limit: 12,
+          page: state.page,
+          sort: state.sort,
+        });
+        if (state.q) query.set('q', state.q);
+        if (state.category) query.set('category', state.category);
+        if (state.badge) query.set('badge', state.badge);
+        if (state.minPrice) query.set('minPrice', state.minPrice);
+        if (state.maxPrice) query.set('maxPrice', state.maxPrice);
+
+        const res = await api.get('/products?' + query);
+        const { data, pagination } = res;
+
+        // Títulos dinámicos
+        let title = '🍭 Todas las chuches';
+        let sub = 'Golosinas para todos los gustos: bolsas, tarros, cajas y packs.';
+        if (state.q) { title = `🔎 Resultados para “${state.q}”`; sub = `${pagination.total} productos encontrados`; }
+        else if (state.category) {
+          const btn = document.querySelector(`#cat-filters button[data-cat="${state.category}"]`);
+          if (btn) { title = btn.textContent.trim().replace(/\s+\d+$/, ''); sub = `${pagination.total} productos en esta categoría`; }
+        }
+        document.getElementById('page-title').textContent = title;
+        document.getElementById('page-sub').textContent = sub;
+        document.getElementById('crumb').textContent = title.replace(/^[^\wÁÉÍÓÚÑáéíóúñ]+/, '');
+
+        document.getElementById('result-count').textContent =
+          `${pagination.total} producto${pagination.total === 1 ? '' : 's'} · Página ${pagination.page} de ${pagination.pages}`;
+
+        grid.innerHTML = data.map(productCard).join('');
+        grid.hidden = data.length === 0;
+        empty.hidden = data.length !== 0;
+
+        paginationNav.innerHTML = '';
+        if (pagination.pages > 1) {
+          const mk = (label, page, disabled, active) => {
+            const b = document.createElement('button');
+            b.textContent = label;
+            b.disabled = disabled;
+            if (active) b.classList.add('active');
+            b.addEventListener('click', () => { state.page = page; syncUrl(); load(); window.scrollTo({ top: 0, behavior: 'smooth' }); });
+            return b;
+          };
+          paginationNav.appendChild(mk('←', Math.max(1, state.page - 1), state.page === 1));
+          for (let i = 1; i <= pagination.pages; i++) paginationNav.appendChild(mk(i, i, false, i === state.page));
+          paginationNav.appendChild(mk('→', Math.min(pagination.pages, state.page + 1), state.page === pagination.pages));
+        }
+      } catch (err) {
+        toast(err.message, 'error');
+      }
+    }
+
+    document.getElementById('sort-select').value = state.sort;
+    loadCategories().then(load);
+  </script>
+</body>
+</html>
