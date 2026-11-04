@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tu carrito · Chuches.shop</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍬</text></svg>">
+</head>
+<body>
+  <div id="site-header"></div>
+
+  <div class="page-head">
+    <div class="container">
+      <div class="breadcrumb"><a href="/">Inicio</a> / <span>Carrito</span></div>
+      <h1>🛒 Tu carrito</h1>
+      <p>Revisa tus golosinas antes de finalizar el pedido.</p>
+    </div>
+  </div>
+
+  <main class="container">
+    <!-- Carrito vacío -->
+    <div class="empty-state" id="empty-cart" hidden>
+      <span class="big">🛍️</span>
+      <h2>Tu carrito está vacío</h2>
+      <p>¡Es hora de endulzar el día! Echa un vistazo a nuestras golosinas.</p>
+      <a class="btn" href="/tienda">Ver golosinas</a>
+    </div>
+
+    <div class="cart-layout" id="cart-layout" hidden>
+      <div>
+        <div class="cart-items" id="cart-items"></div>
+
+        <div class="panel" style="margin-top:1.6rem">
+          <h3>📍 Datos de envío</h3>
+          <form class="checkout-form" id="checkout-form">
+            <div class="field-row">
+              <div class="field">
+                <label for="f-name">Nombre y apellidos *</label>
+                <input id="f-name" name="name" required maxlength="80" autocomplete="name">
+              </div>
+              <div class="field">
+                <label for="f-email">Email *</label>
+                <input id="f-email" name="email" type="email" required autocomplete="email">
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="f-phone">Teléfono *</label>
+                <input id="f-phone" name="phone" required maxlength="15" autocomplete="tel">
+              </div>
+              <div class="field">
+                <label for="f-postal">Código postal *</label>
+                <input id="f-postal" name="postal" required maxlength="5" inputmode="numeric" autocomplete="postal-code">
+              </div>
+            </div>
+            <div class="field">
+              <label for="f-address">Dirección *</label>
+              <input id="f-address" name="address" required maxlength="120" autocomplete="street-address" placeholder="Calle, número, piso, puerta">
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="f-city">Ciudad *</label>
+                <input id="f-city" name="city" required maxlength="60" autocomplete="address-level2">
+              </div>
+              <div class="field">
+                <label for="f-province">Provincia *</label>
+                <input id="f-province" name="province" required maxlength="60" autocomplete="address-level1">
+              </div>
+            </div>
+            <div class="field">
+              <label for="f-notes">Notas para la entrega (opcional)</label>
+              <textarea id="f-notes" name="notes" rows="2" maxlength="300" placeholder="Ej: llamar antes de subir, dejar en portería…"></textarea>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <aside class="summary-card">
+        <h3>Resumen del pedido</h3>
+        <div class="free-shipping-bar" id="shipping-msg"></div>
+        <div class="coupon-row">
+          <input id="coupon-input" placeholder="CÓDIGO CUPÓN" maxlength="20">
+          <button class="btn btn-dark btn-sm" id="coupon-btn">Aplicar</button>
+        </div>
+        <div class="totals-row"><span>Subtotal</span><strong id="t-subtotal"></strong></div>
+        <div class="totals-row" id="discount-row" hidden style="color:var(--green)">
+          <span>Descuento</span><strong id="t-discount"></strong>
+        </div>
+        <div class="totals-row"><span>Envío</span><strong id="t-shipping"></strong></div>
+        <div class="totals-row grand"><span>Total</span><span id="t-total"></span></div>
+        <button class="btn btn-block" id="pay-btn">🔒 Finalizar pedido</button>
+        <small style="color:var(--muted);text-align:center">Demo de pago: no se realiza ningún cargo real.</small>
+        <button class="btn btn-ghost btn-block btn-sm" id="clear-btn">Vaciar carrito</button>
+      </aside>
+    </div>
+
+    <!-- Confirmación -->
+    <div class="empty-state" id="order-ok" hidden>
+      <span class="big">🎉</span>
+      <h2>¡Pedido confirmado!</h2>
+      <p>Tu pedido <strong id="order-code"></strong> <strong>ha sido procesado y será enviado</strong> en 36/72 h laborables.<br>
+        Te enviaremos la confirmación a <strong id="order-email"></strong>.</p>
+      <a class="btn" href="/tienda">Seguir comprando</a>
+    </div>
+  </main>
+
+  <div id="site-footer"></div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/layout.js"></script>
+  <script>
+    const { escapeHtml, toast } = window.layout;
+    const FREE_FROM = 20;
+    let cart = null;
+
+    const el = (id) => document.getElementById(id);
+
+    /* El flujo de compra completo exige sesión: sin token → panel de acceso */
+    function goToLogin() {
+      location.replace('/cuenta?next=' + encodeURIComponent('/carrito'));
+    }
+    if (!api.auth.token()) goToLogin();
+
+    async function render() {
+      try {
+        cart = await api.get('/cart');
+      } catch (err) {
+        if (err.status === 401) return goToLogin(); // sesión caducada
+        throw err;
+      }
+      const hasItems = cart.items.length > 0;
+      el('empty-cart').hidden = hasItems;
+      el('cart-layout').hidden = !hasItems;
+      if (!hasItems) return;
+
+      el('cart-items').innerHTML = cart.items.map((i) => `
+        <div class="cart-line" data-id="${i.productId}">
+          <div class="cart-thumb" style="background:${window.layout.hexA(i.color, 0.16)}">${i.emoji}</div>
+          <div>
+            <h3><a href="/producto?id=${i.productId}">${escapeHtml(i.name)}</a></h3>
+            <small>${api.money(i.price)} / ud. ${i.weight ? '· ' + escapeHtml(i.weight) : ''}</small>
+          </div>
+          <div class="qty">
+            <button type="button" data-dec>−</button>
+            <span>${i.quantity}</span>
+            <button type="button" data-inc>+</button>
+          </div>
+          <div style="display:flex;align-items:center;gap:.9rem">
+            <span class="line-total">${api.money(i.lineTotal)}</span>
+            <button class="remove-link" data-del title="Eliminar">🗑️</button>
+          </div>
+        </div>`).join('');
+
+      // Barra de envío gratis
+      const missing = Math.max(0, FREE_FROM - cart.subtotal);
+      const bar = el('shipping-msg');
+      bar.className = 'free-shipping-bar' + (missing === 0 ? ' done' : '');
+      bar.innerHTML = missing === 0
+        ? '✅ ¡Tienes envío gratis!'
+        : `🚚 Te faltan <strong>${api.money(missing)}</strong> para el envío gratis
+           <div class="progress"><i style="width:${Math.min(100, (cart.subtotal / FREE_FROM) * 100)}%"></i></div>`;
+
+      el('t-subtotal').textContent = api.money(cart.subtotal);
+      el('t-shipping').textContent = cart.shipping === 0 ? 'Gratis ✓' : api.money(cart.shipping);
+      el('t-total').textContent = api.money(cart.total);
+      el('discount-row').hidden = !cart.discount;
+      if (cart.discount) el('t-discount').textContent = '-' + api.money(cart.discount);
+      if (cart.coupon?.code) el('coupon-input').value = cart.coupon.code;
+    }
+
+    el('cart-items').addEventListener('click', async (e) => {
+      const line = e.target.closest('[data-id]');
+      if (!line) return;
+      const id = line.dataset.id;
+      const item = cart.items.find((i) => String(i.productId) === id);
+      try {
+        if (e.target.closest('[data-del]')) {
+          await api.del(`/cart/items/${id}`);
+        } else if (e.target.closest('[data-inc]')) {
+          await api.patch(`/cart/items/${id}`, { quantity: item.quantity + 1 });
+        } else if (e.target.closest('[data-dec]')) {
+          if (item.quantity <= 1) await api.del(`/cart/items/${id}`);
+          else await api.patch(`/cart/items/${id}`, { quantity: item.quantity - 1 });
+        } else return;
+        await render();
+        await window.layout.refreshCart();
+      } catch (err) {
+        toast(err.message, 'error');
+      }
+    });
+
+    el('coupon-btn').addEventListener('click', async () => {
+      const code = el('coupon-input').value.trim();
+      if (!code) return toast('Escribe un código de cupón', 'error');
+      try {
+        cart = await api.post('/coupons/validate', { code });
+        toast(cart.coupon?.applied ? ` Cupón ${cart.coupon.code} aplicado 🎉` : 'Cupón registrado');
+        await render();
+      } catch (err) {
+        toast(err.message, 'error');
+      }
+    });
+
+    el('clear-btn').addEventListener('click', async () => {
+      await api.del('/cart');
+      await render();
+      await window.layout.refreshCart();
+      toast('Carrito vaciado');
+    });
+
+    // Rellenar email automáticamente si hay sesión
+    const user = api.auth.user();
+    if (user) {
+      el('f-email').value = user.email;
+      el('f-name').value = user.name;
+    }
+
+    el('pay-btn').addEventListener('click', async () => {
+      if (!api.auth.token()) return goToLogin();
+      const form = el('checkout-form');
+      if (!form.reportValidity()) {
+        form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return toast('Completa los datos de envío', 'error');
+      }
+      const data = Object.fromEntries(new FormData(form));
+      const btn = el('pay-btn');
+      btn.disabled = true;
+      btn.textContent = 'Procesando…';
+      try {
+        const order = await api.post('/orders', data);
+        // Aviso de éxito: el pedido está confirmado y se enviará
+        toast(`🎉 ¡Pedido procesado! Será enviado en 36/72 h · Código ${order.code}`);
+        el('cart-layout').hidden = true;
+        el('order-ok').hidden = false;
+        el('order-code').textContent = order.code;
+        el('order-email').textContent = order.email;
+        await window.layout.refreshCart();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } catch (err) {
+        toast(err.message, 'error');
+      } finally {
+        // El botón SIEMPRE vuelve a su estado inicial (éxito o error)
+        btn.disabled = false;
+        btn.innerHTML = '🔒 Finalizar pedido';
+      }
+    });
+
+    render();
+  </script>
+</body>
+</html>

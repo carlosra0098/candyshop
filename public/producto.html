@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Producto · Chuches.shop</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍬</text></svg>">
+</head>
+<body>
+  <div id="site-header"></div>
+
+  <div class="page-head">
+    <div class="container">
+      <div class="breadcrumb">
+        <a href="/">Inicio</a> / <a href="/tienda">Golosinas</a> / <span id="crumb-product">Producto</span>
+      </div>
+    </div>
+  </div>
+
+  <main class="container">
+    <section class="product-detail" id="detail" hidden>
+      <div class="product-art" id="art"><span class="emoji" id="art-emoji"></span></div>
+      <div class="product-info">
+        <div class="stars" id="p-stars"></div>
+        <h1 id="p-name"></h1>
+        <div class="price-row">
+          <span class="price" id="p-price"></span>
+          <span class="price-old" id="p-old" hidden></span>
+        </div>
+        <p class="unit-price" id="p-unit"></p>
+        <p class="desc" id="p-desc"></p>
+
+        <div class="meta-list">
+          <div>📦 <strong>Formato:</strong> <span id="p-unit2"></span></div>
+          <div>⚖️ <strong>Peso:</strong> <span id="p-weight"></span></div>
+          <div>🏷️ <strong>Categoría:</strong> <span id="p-cat"></span></div>
+        </div>
+
+        <div class="buy-row">
+          <div class="qty">
+            <button type="button" id="qty-minus">−</button>
+            <span id="qty-val">1</span>
+            <button type="button" id="qty-plus">+</button>
+          </div>
+          <button class="btn" id="buy-btn">🛒 Añadir al carrito</button>
+          <span class="stock-pill" id="p-stock"></span>
+        </div>
+
+        <div class="features" style="border:none;padding:0">
+          <div class="feature"><span class="f-ico">🚚</span><div><strong>Envío 36/72h</strong><small>Gratis desde 20€</small></div></div>
+          <div class="feature" style="margin-top:0.8rem"><span class="f-ico">↩️</span><div><strong>14 días de devolución</strong><small>Sin preguntas raras</small></div></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="empty-state" id="not-found" hidden>
+      <span class="big">😕</span>
+      <h2>Producto no encontrado</h2>
+      <p>Puede que se haya agotado o cambiado de nombre.</p>
+      <a class="btn" href="/tienda">Volver a la tienda</a>
+    </div>
+
+    <section class="section" id="reviews-section" hidden>
+      <div class="section-head"><h2>💬 Opiniones</h2></div>
+      <div class="reviews" id="reviews"></div>
+
+      <div class="panel" style="margin-top:1.6rem;max-width:560px">
+        <h3>Deja tu valoración</h3>
+        <form class="checkout-form" id="review-form">
+          <div class="field-row">
+            <div class="field">
+              <label for="r-name">Tu nombre</label>
+              <input id="r-name" name="name" required maxlength="60">
+            </div>
+            <div class="field">
+              <label for="r-rating">Valoración</label>
+              <select id="r-rating" name="rating">
+                <option value="5">★★★★★ Excelente</option>
+                <option value="4">★★★★ Muy bueno</option>
+                <option value="3">★★★ Regular</option>
+                <option value="2">★★ Malo</option>
+                <option value="1">★ Muy malo</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label for="r-comment">Comentario</label>
+            <textarea id="r-comment" name="comment" rows="3" maxlength="1000" placeholder="Cuéntanos qué tal estuvieron…"></textarea>
+          </div>
+          <button class="btn" type="submit">Publicar opinión</button>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <section class="section" style="background:#fff" id="related-section" hidden>
+    <div class="container">
+      <div class="section-head"><h2>🍬 También te pueden gustar</h2></div>
+      <div class="product-grid" id="related"></div>
+    </div>
+  </section>
+
+  <div id="site-footer"></div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/layout.js"></script>
+  <script>
+    const { escapeHtml, productCard, bindCardActions, toast, stars } = window.layout;
+    const id = new URLSearchParams(location.search).get('id');
+    let product = null;
+
+    async function load() {
+      if (!id) { document.getElementById('not-found').hidden = false; return; }
+      try {
+        product = await api.get('/products/' + encodeURIComponent(id));
+      } catch {
+        document.getElementById('not-found').hidden = false;
+        return;
+      }
+
+      document.title = `${product.name} · Chuches.shop`;
+      document.getElementById('crumb-product').textContent = product.name;
+      document.getElementById('detail').hidden = false;
+      document.getElementById('art').style.background = window.layout.hexA(product.color, 0.18);
+      document.getElementById('art-emoji').textContent = product.emoji;
+      document.getElementById('p-name').textContent = product.name;
+      document.getElementById('p-stars').innerHTML = `${stars(product.rating)}<small>${product.rating.toFixed(1)} · ${product.reviews.length} opiniones</small>`;
+      document.getElementById('p-price').textContent = api.money(product.price);
+      if (product.comparePrice) {
+        const old = document.getElementById('p-old');
+        old.textContent = api.money(product.comparePrice);
+        old.hidden = false;
+      }
+      const unitLine = product.weight ? `${api.money(product.price)} / ${product.weight}` : `Precio por ${product.unit}`;
+      document.getElementById('p-unit').textContent = unitLine;
+      document.getElementById('p-unit2').textContent = `${product.unit} (${product.weight || '—'})`;
+      document.getElementById('p-weight').textContent = product.weight || '—';
+      document.getElementById('p-cat').innerHTML = product.category
+        ? `<a href="/tienda?category=${product.category.slug}" style="color:var(--pink);font-weight:800">${product.category.emoji} ${escapeHtml(product.category.name)}</a>`
+        : '—';
+      document.getElementById('p-desc').textContent = product.description;
+
+      const stockEl = document.getElementById('p-stock');
+      const buyBtn = document.getElementById('buy-btn');
+      if (product.stock > 0) {
+        stockEl.textContent = product.stock < 25 ? `¡Solo quedan ${product.stock}!` : 'En stock ✓';
+        stockEl.classList.toggle('low', product.stock < 25);
+      } else {
+        stockEl.textContent = 'Agotado';
+        stockEl.classList.add('low');
+        buyBtn.disabled = true;
+        buyBtn.textContent = 'Sin stock';
+      }
+
+      // Cantidad
+      let qty = 1;
+      const qtyVal = document.getElementById('qty-val');
+      document.getElementById('qty-minus').addEventListener('click', () => { qty = Math.max(1, --qty); qtyVal.textContent = qty; });
+      document.getElementById('qty-plus').addEventListener('click', () => { qty = Math.min(product.stock, ++qty); qtyVal.textContent = qty; });
+      buyBtn.addEventListener('click', async () => {
+        buyBtn.disabled = true;
+        const okAdd = await window.layout.addToCart(product.id, qty);
+        buyBtn.disabled = product.stock <= 0;
+        if (okAdd) toast(`${qty} × ${product.name} añadido 🛒`);
+      });
+
+      // Reseñas
+      const section = document.getElementById('reviews-section');
+      section.hidden = false;
+      const reviewsEl = document.getElementById('reviews');
+      reviewsEl.innerHTML = product.reviews.length
+        ? product.reviews.map((r) => `
+          <article class="review">
+            <header>
+              <span class="who">${escapeHtml(r.name)} <span class="stars" style="margin-left:.4rem">${stars(r.rating)}</span></span>
+              <time>${new Date(r.createdAt).toLocaleDateString('es-ES')}</time>
+            </header>
+            <p>${escapeHtml(r.comment || 'Sin comentarios')}</p>
+          </article>`).join('')
+        : '<p style="color:var(--muted)">Todavía no hay opiniones. ¡Sé el primero!</p>';
+
+      document.getElementById('review-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        try {
+          await api.post(`/products/${product.id}/reviews`, Object.fromEntries(fd));
+          toast('¡Gracias por tu opinión! 💖');
+          location.reload();
+        } catch (err) {
+          toast(err.message, 'error');
+        }
+      });
+
+      // Relacionados (misma categoría)
+      if (product.category) {
+        const rel = await api.get(`/products?category=${product.category.slug}&limit=4`);
+        const items = rel.data.filter((p) => p.id !== product.id).slice(0, 4);
+        if (items.length) {
+          document.getElementById('related-section').hidden = false;
+          const grid = document.getElementById('related');
+          grid.innerHTML = items.map(productCard).join('');
+          bindCardActions(grid);
+        }
+      }
+    }
+
+    load();
+  </script>
+</body>
+</html>

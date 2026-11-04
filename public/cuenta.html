@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mi cuenta · Chuches.shop</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍬</text></svg>">
+</head>
+<body>
+  <div id="site-header"></div>
+
+  <main class="container">
+    <!-- Login / Registro -->
+    <section class="auth-card" id="auth-card">
+      <h1 id="auth-title">👋 ¡Hola de nuevo!</h1>
+      <p class="sub" id="auth-sub">Inicia sesión para ver tus pedidos y acumular dulces.</p>
+      <form class="checkout-form" id="auth-form">
+        <div class="field" id="name-field" hidden>
+          <label for="a-name">Nombre</label>
+          <input id="a-name" name="name" maxlength="60">
+        </div>
+        <div class="field">
+          <label for="a-email">Email</label>
+          <input id="a-email" name="email" type="email" required autocomplete="email">
+        </div>
+        <div class="field">
+          <label for="a-password">Contraseña</label>
+          <input id="a-password" name="password" type="password" required minlength="6" autocomplete="current-password">
+          <span class="hint">Mínimo 6 caracteres</span>
+        </div>
+        <button class="btn btn-block" id="auth-submit" type="submit">Entrar</button>
+      </form>
+      <!-- Login con GitHub (OAuth 2.0 de tercero; se oculta si no está configurado) -->
+      <div class="auth-oauth" id="github-box" hidden>
+        <div class="auth-divider"><span>o continúa con</span></div>
+        <a class="btn btn-block btn-github" id="github-btn" href="#">🐙 Entrar con GitHub</a>
+      </div>
+      <p class="auth-switch">
+        <span id="switch-text">¿Aún no tienes cuenta?</span>
+        <button id="switch-mode" type="button">Regístrate aquí</button>
+      </p>
+      <p class="auth-switch" style="font-size:.78rem">
+        Demo: <b>cliente@candyshop.test</b> / <b>cliente123</b> · Admin: <b>admin@candyshop.test</b> / <b>admin123</b> · Staff: <b>staff@candyshop.test</b> / <b>staff123</b>
+      </p>
+    </section>
+
+    <!-- Zona logueada -->
+    <section id="account-view" hidden>
+      <div class="page-head" style="margin-top:1rem;border-radius:18px">
+        <div class="container" style="width:auto;padding:0 2rem">
+          <h1 id="hello">👋 Hola</h1>
+          <p id="hello-sub"></p>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:.8rem;margin:1.4rem 0;flex-wrap:wrap">
+        <a class="btn" href="/tienda">🛍️ Seguir comprando</a>
+        <a class="btn btn-ghost" id="admin-link" href="/admin" hidden>🛠️ Panel admin</a>
+        <button class="btn btn-dark" id="logout-btn">Cerrar sesión</button>
+      </div>
+
+      <div class="panel">
+        <h2>📦 Mis pedidos</h2>
+        <div id="orders"></div>
+      </div>
+
+      <!-- Seguridad: cambiar contraseña (cualquier rol: cliente, staff o admin) -->
+      <div class="panel" id="password-panel">
+        <h2>🔒 Cambiar contraseña</h2>
+        <p style="color:var(--muted);margin-bottom:1rem">
+          Vale para cualquier rol (cliente, staff o admin). Al cambiarla se cierran
+          las sesiones abiertas en otros dispositivos.
+        </p>
+        <form class="checkout-form" id="password-form" style="max-width:440px">
+          <div class="field">
+            <label for="p-current">Contraseña actual</label>
+            <input id="p-current" name="currentPassword" type="password" required autocomplete="current-password">
+          </div>
+          <div class="field">
+            <label for="p-new">Nueva contraseña</label>
+            <input id="p-new" name="newPassword" type="password" required minlength="6" autocomplete="new-password">
+            <span class="hint">Mínimo 6 caracteres y distinta a la actual.</span>
+          </div>
+          <div class="field">
+            <label for="p-confirm">Repite la nueva contraseña</label>
+            <input id="p-confirm" name="confirm" type="password" required minlength="6" autocomplete="new-password">
+          </div>
+          <button class="btn" type="submit">Cambiar contraseña</button>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <div id="site-footer"></div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/layout.js"></script>
+  <script>
+    const { toast, escapeHtml } = window.layout;
+    const el = (id) => document.getElementById(id);
+    let mode = 'login';
+
+    el('switch-mode').addEventListener('click', () => {
+      mode = mode === 'login' ? 'register' : 'login';
+      const isReg = mode === 'register';
+      el('auth-title').textContent = isReg ? '🍬 Crea tu cuenta' : '👋 ¡Hola de nuevo!';
+      el('auth-sub').textContent = isReg
+        ? 'Regístrate y desbloquea el 10% de bienvenida con el cupón HOLA10.'
+        : 'Inicia sesión para ver tus pedidos y acumular dulces.';
+      el('name-field').hidden = !isReg;
+      el('a-name').required = isReg;
+      el('auth-submit').textContent = isReg ? 'Crear cuenta' : 'Entrar';
+      el('switch-text').textContent = isReg ? '¿Ya tienes cuenta?' : '¿Aún no tienes cuenta?';
+      el('switch-mode').textContent = isReg ? 'Inicia sesión' : 'Regístrate aquí';
+    });
+
+    /** Destino seguro (?next=…): solo rutas locales de esta misma web. */
+    function safeNext() {
+      const next = new URLSearchParams(location.search).get('next');
+      return next && next.startsWith('/') && !next.startsWith('//') ? next : null;
+    }
+
+    el('auth-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = Object.fromEntries(new FormData(e.target));
+      try {
+        // OAuth 2.0 (Authorization Code + PKCE): el registro crea la cuenta
+        // y a continuación se obtienen los tokens por /oauth/authorize → /oauth/token
+        const res = mode === 'register'
+          ? await api.auth.register(fd)
+          : await api.auth.login(fd.email, fd.password);
+        api.auth.set(res.access_token, res.user, res.refresh_token);
+
+        // Fusionar carrito de invitado con el de la cuenta
+        try { await api.post('/cart/merge', { token: api.cartToken() }); } catch {}
+
+        // Si veníamos del flujo de compra (?next=…), volvemos a él
+        const next = safeNext();
+        if (next) {
+          location.href = next;
+          return;
+        }
+        toast(mode === 'register' ? '¡Cuenta creada! 🎉' : `¡Bienvenido, ${res.user.name.split(' ')[0]}! 👋`);
+        await window.layout.renderLayout();
+        showAccount();
+      } catch (err) {
+        toast(err.message, 'error');
+      }
+    });
+
+    /* ── Cambiar contraseña (cualquier rol: cliente, staff o admin) ── */
+    el('password-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = Object.fromEntries(new FormData(e.target));
+      if (fd.newPassword !== fd.confirm) return toast('Las contraseñas nuevas no coinciden', 'error');
+      const btn = e.target.querySelector('button[type="submit"]');
+      btn.disabled = true;
+      btn.textContent = 'Guardando…';
+      try {
+        await api.post('/auth/change-password', {
+          currentPassword: fd.currentPassword,
+          newPassword: fd.newPassword,
+        });
+        // El servidor revocó los refresh tokens: renovamos la sesión
+        // con la contraseña nueva para no perder la sesión actual
+        try {
+          const user = api.auth.user();
+          const res = await api.auth.login(user.email, fd.newPassword);
+          api.auth.set(res.access_token, res.user, res.refresh_token);
+        } catch {}
+        e.target.reset();
+        toast('🔒 Contraseña actualizada correctamente. Las demás sesiones se han cerrado.');
+      } catch (err) {
+        toast(err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Cambiar contraseña';
+      }
+    });
+
+    async function showAccount() {
+      const user = api.auth.user();
+      if (!user) {
+        el('auth-card').hidden = false;
+        el('account-view').hidden = true;
+        return;
+      }
+      el('auth-card').hidden = true;
+      el('account-view').hidden = false;
+      el('hello').textContent = `👋 Hola, ${user.name.split(' ')[0]}`;
+      el('hello-sub').textContent = `${user.email} · ${({ admin: 'Administrador', staff: 'Personal (staff)' }[user.role] || 'Cliente')}`;
+      // El botón del panel es solo para el rol admin (el staff entra por el enlace del pie o la URL)
+      el('admin-link').hidden = user.role !== 'admin';
+
+      // Cargar pedidos del usuario (sesión autenticada)
+      const ordersEl = el('orders');
+      ordersEl.innerHTML = '<p style="color:var(--muted)">Cargando pedidos…</p>';
+      let found = [];
+      try {
+        const res = await api.get('/orders');
+        found = res.data || [];
+      } catch {}
+      if (!found.length) {
+        // Fallback: intentar el endpoint admin si es admin, o mostrar vacío
+        ordersEl.innerHTML = `
+          <div class="empty-state" style="padding:2rem 0">
+            <span class="big">🧺</span>
+            <p>Todavía no tienes pedidos.<br>¡Anímate a llevarte tus golosinas favoritas!</p>
+            <a class="btn" href="/tienda">Ver golosinas</a>
+          </div>`;
+        return;
+      }
+      ordersEl.innerHTML = '<div class="table-wrap"><table class="table"><thead><tr>' +
+        '<th>Código</th><th>Fecha</th><th>Artículos</th><th>Total</th><th>Estado</th></tr></thead><tbody>' +
+        found.map((o) => `
+          <tr>
+            <td><strong>${escapeHtml(o.code)}</strong></td>
+            <td>${new Date(o.created_at || o.createdAt).toLocaleDateString('es-ES')}</td>
+            <td>—</td>
+            <td><strong>${api.money(o.total)}</strong></td>
+            <td><span class="status-pill status-${o.status}">${statusLabel(o.status)}</span></td>
+          </tr>`).join('') +
+        '</tbody></table></div>';
+    }
+
+    function statusLabel(s) {
+      return { pending: 'Pendiente', paid: 'Pagado', shipped: 'Enviado', delivered: 'Entregado', cancelled: 'Cancelado' }[s] || s;
+    }
+
+    el('logout-btn').addEventListener('click', async () => {
+      api.auth.clear();
+      await window.layout.renderLayout();
+      toast('Sesión cerrada');
+      showAccount();
+    });
+
+    /* Mostrar el botón de GitHub solo si el backend lo tiene configurado */
+    fetch('/auth/github/status').then((r) => r.json()).then((s) => {
+      if (s.configured) {
+        el('github-btn').href = api.auth.githubUrl();
+        el('github-box').hidden = false;
+      }
+    }).catch(() => {});
+
+    // Con sesión y ?next=… → volver al punto del flujo de compra que lo pidió.
+    // api.auth.ready completa tanto el ?code= (PKCE) como el #access_token (GitHub).
+    (async () => {
+      await api.auth.ready;
+      if (window.__csAuthError) {
+        toast(window.__csAuthError, 'error');
+        window.__csAuthError = null;
+      } else if (window.__csGithubLogin) {
+        toast(`¡Bienvenido, ${window.__csGithubLogin.name.split(' ')[0]}! 👋 (GitHub)`);
+        window.__csGithubLogin = null;
+        await window.layout.renderLayout();
+      }
+      const pendingNext = safeNext();
+      if (api.auth.user() && pendingNext) location.replace(pendingNext);
+      else showAccount();
+    })();
+  </script>
+</body>
+</html>
