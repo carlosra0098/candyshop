@@ -1,6 +1,6 @@
 # 🍬 CandyShop — API REST + Frontend (Python + FastAPI)
 
-Enlace para entrar a la página publicada en Render --> (https://candyshop-api.onrender.com/)
+Enlace para entrar a la página publicada en Render --> https://candyshop-api.onrender.com/
 
 Backend en **Python 3.14 + FastAPI** con **PostgreSQL + OAuth 2.0**, frontend vanilla servido desde `backend-python/app/static/`.
 
