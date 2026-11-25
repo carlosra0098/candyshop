@@ -1,144 +1,165 @@
-# 🍬 CandyShop — API REST + Frontend (Python + FastAPI)
+# 🍬 CandyShop — API REST (FastAPI) + Frontend (React)
 
 Enlace para entrar a la página publicada en Render --> https://candyshop-api.onrender.com/
 
-Backend en **Python 3.14 + FastAPI** con **PostgreSQL + OAuth 2.0**, frontend vanilla servido desde `backend-python/app/static/`.
+Proyecto separado en dos aplicaciones independientes:
 
-## 🚀 Arranque rápido
+- **`backend-python/`** → API REST con **Python 3.14 + FastAPI + PostgreSQL + OAuth 2.0**. Ya no sirve HTML.
+- **`frontend/`** → SPA con **React 18 + Vite**, servida en otro origen (5173 en desarrollo).
+
+## 🚀 Arranque rápido (dos terminales)
+
+**1. Backend** (API en `http://localhost:8000`):
 
 ```bash
 cd candyshop/backend-python
 .\.venv\Scripts\pip install -r requirements.txt   # solo la primera vez
-.\run.ps1                                          # arranca en http://localhost:8000
+.\run.ps1                                          # http://localhost:8000/docs
 ```
 
-Abre **http://localhost:8000** 🎉
+**2. Frontend** (web en `http://localhost:5173`):
+
+```bash
+cd candyshop/frontend
+npm install                                        # solo la primera vez
+copy .env.example .env                             # VITE_API_URL=http://localhost:8000
+npm run dev
+```
+
+Abre **http://localhost:5173** 🎉
 
 > **Requisitos**
-> - Python 3.14
-> - **PostgreSQL 17** corriendo en `localhost:5432` con base de datos `candyshop` (rol `candyshop`).
->   La URL de conexión va en `.env` de la raíz (`DATABASE_URL`); copia `.env.example` → `.env` y ajusta.
->
-> El esquema se crea automáticamente en el primer arranque y, si la BD está vacía, se puebla con datos de ejemplo. Para regenerar datos: usa los scripts del backend o `seed`.
+> - Python 3.14 y Node 20+ (probado con Node 24).
+> - PostgreSQL 17 en `localhost:5432` con la base `candyshop` (rol `candyshop`). Copia `.env.example` → `.env` en la raíz y ajusta `DATABASE_URL`.
+> - El esquema y los datos de ejemplo se crean automáticamente en el primer arranque del backend.
 
 ### Cuentas de prueba
 
 | Rol | Email | Contraseña |
 |------|---------------------------|-------------|
-| Admin| `admin@candyshop.test` | `admin123` |
+| Admin | `admin@candyshop.test` | `admin123` |
 | Staff | `staff@candyshop.test` | `staff123` |
 | Cliente | `cliente@candyshop.test` | `cliente123` |
 
-**Jerarquía de roles:** `customer` < `staff` < `admin`. El rol se valida siempre contra la BD (el JWT solo aporta el scope).
+**Jerarquía:** `customer` < `staff` < `admin`. El rol se valida siempre contra la BD (el JWT solo aporta el scope).
 
 - `customer`: compra y consulta sus propios pedidos.
-- `staff`: gestiona **pedidos** (ver todos + cambiar estado) y **productos** (CRUD). No accede a estadísticas, usuarios, cupones ni categorías.
+- `staff`: gestiona **pedidos** (ver todos + cambiar estado) y **productos** (CRUD). Sin estadísticas, usuarios, cupones ni categorías.
 - `admin`: todo lo anterior + estadísticas, usuarios, cupones y categorías.
 
-- Panel admin: http://localhost:8000/admin
-- Cupones de ejemplo: `HOLA10` (−10 %), `BIENVENIDA5` (−5 € desde 20 €), `MESA20` (−20 % desde 60 €)
-
-### Clientes OAuth 2.0
-
-| client_id | Tipo | Secreto | Grants |
-|-----------|------|---------|--------|
-| `candyshop-web` | público (SPA) | — (PKCE obligatorio) | `authorization_code`, `refresh_token` |
-| `candyshop-server` | confidencial | `candyshop-secret-2026` | `client_credentials` (actúa en nombre del admin) |
+- Panel admin: http://localhost:5173/admin (el botón "🛠️ Panel admin" en `/cuenta` aparece solo para `admin`).
+- Cupones de ejemplo: `HOLA10` (−10 %), `BIENVENIDA5` (−5 € desde 20 €), `MESA20` (−20 % desde 60 €).
 
 ## 🔐 Autenticación: OAuth 2.0 + JWT (sin cookies ni sesiones)
 
-- **Access token**: JWT `HS256` con `typ: at+jwt`, TTL **15 min**, claims `sub/iss/aud/scope/client_id/jti/iat/exp`.
-- **Scopes** (`scope`): `profile`, `email`, `orders` para cualquier usuario; `staff` solo si el rol es `staff`/`admin`; `admin` solo si el rol es `admin`.
-- **Refresh token**: opaco y aleatorio (30 días), guardado **hasheado** en BD, **rota en cada uso**. Reutilizarlo tras la rotación revoca **toda la familia**.
-- **PKCE (S256)** obligatorio en el flujo de authorization code.
-- Nunca se usa una cookie ni una sesión de servidor.
+- **Access token**: JWT `HS256` (`typ: at+jwt`), TTL **15 min**, claims `sub/iss/aud/scope/client_id/jti/iat/exp`.
+- **Scopes**: `profile`, `email`, `orders` para cualquier usuario; `staff` para `staff`/`admin`; `admin` solo para `admin`.
+- **Refresh token**: opaco, guardado **hasheado** en BD, **rota en cada uso**; reutilizar uno antiguo revoca la familia.
+- **PKCE (S256)** obligatorio en `authorization_code`.
 
-### Flujo del frontend (Authorization Code + PKCE)
+Flujo del frontend React (`frontend/src/lib/api.js`):
 
 ```
 POST /oauth/authorize  (credenciales + code_challenge)  →  { code }
 POST /oauth/token      (code + code_verifier)           →  { access_token, refresh_token }
 GET  /api/...          Authorization: Bearer <access_token>
-POST /oauth/token      (grant_type=refresh_token)       →  rotación automática
+POST /oauth/token      (grant_type=refresh_token)       →  rotación automática en 401
 ```
 
-Si el cliente envía `Accept: application/json`, `/oauth/authorize` devuelve `{code, state}` sin redireccionar; los navegadores (Accept: text/html) reciben el formulario de login y un `302` al `redirect_uri` registrado.
+### Clientes OAuth
 
-### Endpoints OAuth
+| client_id | Tipo | Secreto | Grants |
+|-----------|------|---------|--------|
+| `candyshop-web` | público (SPA React) | — (PKCE) | `authorization_code`, `refresh_token` |
+| `candyshop-server` | confidencial | `candyshop-secret-2026` | `client_credentials` |
 
-| Método | Ruta | Descripción |
-|--------|------|-------------|
-| GET | `/oauth/authorize` | Pantalla de login HTML |
-| POST | `/oauth/authorize` | Valida credenciales y emite el `code` |
-| POST | `/oauth/token` | Grants: `authorization_code` (+PKCE), `refresh_token` (rotación), `client_credentials` |
-| POST | `/oauth/revoke` | Revoca un refresh token (RFC 7009) |
-| POST | `/oauth/introspect` | Consulta de tokens (RFC 7662, requiere cliente confidencial) |
-| GET | `/oauth/.well-known/openid-configuration` | Metadatos del servidor |
-
-### Ejemplo con curl (server-to-server)
+Redirect URIs registradas: `http://localhost:5173/cuenta`, `http://localhost:5173/admin` (y `4173`/`8000` legados). En producción se añaden las de `FRONTEND_ORIGIN`.
 
 ```bash
-# 1) Token por client_credentials (cliente confidencial)
-curl -u candyshop-server:candyshop-secret-2026 \
-     -d grant_type=client_credentials http://localhost:8000/oauth/token
-
-# 2) Usarlo contra la API
-curl -H "Authorization: Bearer <access_token>" http://localhost:8000/api/admin/stats
+curl -u candyshop-server:candyshop-secret-2026 -d grant_type=client_credentials \
+     http://localhost:8000/oauth/token
 ```
 
 ## 🐙 Login con GitHub
 
-Botón **🐙 Entrar con GitHub** en `/cuenta` y `/admin`. Federación de identidad: CandyShop valida la sesión con GitHub y emite sus propios tokens.
+El botón aparece en `/cuenta` y `/admin` solo si el backend tiene configuradas las variables `GITHUB_*`.
 
-- `GET /auth/github/login?redirect=/cuenta` → guarda `state` de un solo uso y redirige a GitHub.
-- `GET /auth/github/callback?code&state` → canjea el code, obtiene perfil/emails, vincula o crea la cuenta local y devuelve tokens en el `#fragment`.
-- Vinculación automática si existe cuenta con mismo email. Anti open-redirect.
-- Variables en `.env`: `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GITHUB_CALLBACK_URL`.
+- `GET /auth/github/login?redirect=/cuenta` → `state` de un solo uso → GitHub.
+- `GET /auth/github/callback?code&state` → emite los tokens de CandyShop y vuelve a **`FRONTEND_ORIGIN`** con los tokens en el `#fragment` (anti open-redirect).
+- Callback URL a configurar en GitHub: `http://localhost:8000/auth/github/callback` (o la URL pública del backend).
 
 ## 🗂️ Estructura
 
 ```
 candyshop/
-├── .env / .env.example
+├── .env / .env.example          # configuración del backend
 ├── README.md
-└── backend-python/
-    ├── requirements.txt
-    ├── run.ps1
-    └── app/
-        ├── main.py      # FastAPI app, estáticos, rutas
-        ├── api.py       # Endpoints de la tienda
-        ├── oauth.py     # Servidor OAuth 2.0
-        ├── auth.py      # scrypt + JWT + PKCE + refresh tokens
-        ├── db.py        # Pool PostgreSQL + esquema + helpers
-        ├── seed.py      # Datos de ejemplo
-        ├── config.py    # Configuración
-        ├── errors.py    # Errores
-        ├── github.py    # OAuth GitHub
-        └── static/      # Frontend vanilla (HTML/CSS/JS)
+├── netlify.toml                 # despliegue de la SPA (rewrite a /index.html)
+├── backend-python/
+│   ├── requirements.txt
+│   ├── run.ps1
+│   └── app/
+│       ├── main.py      # FastAPI: CORS, errores, routers (sin estáticos)
+│       ├── api.py       # Endpoints de la tienda
+│       ├── oauth.py     # Servidor OAuth 2.0
+│       ├── auth.py      # scrypt + JWT + refresh tokens
+│       ├── db.py        # Pool PostgreSQL + esquema
+│       ├── seed.py      # Datos de ejemplo + clientes OAuth
+│       ├── config.py    # Configuración
+│       ├── errors.py
+│       └── github.py
+└── frontend/
+    ├── package.json
+    ├── vite.config.js
+    ├── index.html
+    ├── netlify.toml / .env.example
+    └── src/
+        ├── main.jsx / App.jsx / styles.css
+        ├── lib/api.js          # Cliente API + OAuth/PKCE + GitHub
+        ├── context/AppContext.jsx
+        ├── components/         # Layout, ProductCard, Modal
+        └── pages/              # Home, Shop, Product, Cart, Account, Admin, NotFound
 ```
+
+> La carpeta antigua `public/` (HTML/CSS/JS vanilla) se conserva solo como referencia histórica: **FastAPI ya no la sirve**. Puedes borrarla cuando quieras.
 
 ## 🔌 API REST
 
-Base: `http://localhost:8000/api` · Respuestas JSON · Auth por `Authorization: Bearer <access_token>`.
+Base: `http://localhost:8000/api` · Respuestas JSON · `Authorization: Bearer <access_token>`.
 
-> Todo el flujo de compra exige sesión: carrito, cupones y pedidos devuelven `401` sin token. El catálogo, el registro y el login son públicos.
+> Todo el flujo de compra exige sesión: carrito, cupones y pedidos devuelven `401` sin token. Catálogo, registro y login son públicos.
 
-Ver README completo en el código para el listado detallado de endpoints.
+| Grupo | Endpoints |
+|-------|-----------|
+| Públicos | `GET /api/health`, `/api/categories`, `/api/products`, `/api/products/{id}`, `POST /api/products/{id}/reviews`, `POST /api/auth/register`, `POST /api/newsletter` |
+| Sesión | `GET /api/auth/me`, `POST /api/auth/change-password`, `GET/POST /api/cart`, `GET/POST/DELETE /api/cart/items`, `PATCH /api/cart/items/{id}`, `POST /api/coupons/validate`, `DELETE /api/cart/coupon`, `GET/POST /api/orders`, `GET /api/orders/{code}` |
+| Staff + admin | `GET/PATCH /api/admin/orders`, `GET/POST/PUT/DELETE /api/admin/products` |
+| Solo admin | `GET /api/admin/stats`, `GET /api/admin/users`, `POST /api/admin/users/{id}/password`, `GET/POST/DELETE /api/admin/coupons`, `POST/PATCH/DELETE /api/admin/categories` |
 
-## 🎨 Frontend
+Documentación interactiva: http://localhost:8000/docs
 
-Diseño propio inspirado en tiendas de golosinas online. Servido por FastAPI desde `app/static/`. Login con flujo OAuth completo (PKCE), renovación de access token con refresh token, panel administrativo con métricas y CRUD completo.
+## 🌐 Despliegue
+
+**Backend (Render u otro PaaS):** Root Directory `backend-python`, build `pip install -r requirements.txt` y Start Command:
+
+```
+uvicorn app.main:app --host 0.0.0.0 --port $PORT
+```
+
+Variables de entorno del backend: `DATABASE_URL` (Internal Database URL de PostgreSQL), `JWT_SECRET`, `CORS_ORIGIN` (URL del frontend), `FRONTEND_ORIGIN` (misma URL; se usa para redirects y OAuth). **No añadas `:10000` al `--port`**: Render ya inyecta `$PORT`.
+
+**Frontend (Netlify/Vercel/Render Static):** raíz del build `frontend`, comando `npm run build`, salida `frontend/dist`, variable `VITE_API_URL=https://tu-backend`. Necesita rewrite SPA (`/*` → `/index.html`); ya viene en `netlify.toml`. En Vercel, añade `vercel.json` con el mismo rewrite.
 
 ## 🔧 Configuración por entorno
 
 | Variable | Por defecto | Uso |
 |----------|-------------|-----|
-| `PORT` | `8000` | Puerto del servidor |
-| `DATABASE_URL` | `postgres://candyshop:CandyShop_PG_2026@localhost:5432/candyshop` | Conexión PostgreSQL |
+| `PORT` | `3000` (`run.ps1` usa `8000`) | Puerto del backend |
+| `DATABASE_URL` | `postgres://candyshop:...@localhost:5432/candyshop` | Conexión PostgreSQL |
 | `JWT_SECRET` | valor dev | Secreto HMAC de los access tokens |
-| `ACCESS_TOKEN_TTL` | `900` (15 min) | Vida del access token (s) |
-| `REFRESH_TOKEN_TTL` | `2592000` (30 días) | Vida del refresh token (s) |
-| `CORS_ORIGIN` | `*` | Origen permitido |
-| `GITHUB_CLIENT_ID` | — | GitHub OAuth App |
-| `GITHUB_CLIENT_SECRET` | — | GitHub OAuth App |
-| `GITHUB_CALLBACK_URL` | `http://localhost:8000/auth/github/callback` | Callback URL |
+| `ACCESS_TOKEN_TTL` | `900` | Vida del access token (s) |
+| `REFRESH_TOKEN_TTL` | `2592000` | Vida del refresh token (s) |
+| `CORS_ORIGIN` | `*` | Origen(es) permitidos (separados por comas) |
+| `FRONTEND_ORIGIN` | `http://localhost:5173` | URL de la SPA (redirects OAuth/GitHub) |
+| `VITE_API_URL` | `http://localhost:8000` | URL del backend en el frontend React |
+| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` / `GITHUB_CALLBACK_URL` | — | Login con GitHub |

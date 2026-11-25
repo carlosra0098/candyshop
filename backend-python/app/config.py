@@ -33,6 +33,7 @@ class Config:
     )
     jwt_secret: str = os.environ.get("JWT_SECRET", "candyshop-dev-secret-change-me")
     cors_origin: str = os.environ.get("CORS_ORIGIN", "*")
+    frontend_origin: str = os.environ.get("FRONTEND_ORIGIN", "http://localhost:5173")
     access_ttl: int = int(os.environ.get("ACCESS_TOKEN_TTL", str(60 * 15)))          # 15 min
     refresh_ttl: int = int(os.environ.get("REFRESH_TOKEN_TTL", str(60 * 60 * 24 * 30)))  # 30 días
     issuer: str = os.environ.get("OAUTH_ISSUER", "candyshop")

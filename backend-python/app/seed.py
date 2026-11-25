@@ -1,6 +1,7 @@
 """Datos de ejemplo (idénticos a la versión Node) + clientes OAuth."""
 from . import db
 from .auth import hash_password
+from .config import config
 
 CATEGORIES = [
     ("Golosinas", "golosinas", "🍭", "#ff2d95", "Bolsas de gominolas, jellies y dulces de todos los sabores."),
@@ -129,13 +130,19 @@ def ensure_demo_users() -> None:
         )
 
 
-# URIs de redirección registradas (frontend en los puertos de desarrollo)
-REDIRECT_URIS = [
-    "http://localhost:3000/cuenta", "http://localhost:3000/cuenta.html",
-    "http://localhost:3000/admin", "http://localhost:3000/admin.html",
-    "http://localhost:8000/cuenta", "http://localhost:8000/cuenta.html",
-    "http://localhost:8000/admin", "http://localhost:8000/admin.html",
-]
+# URIs de redirección registradas: frontend React (Vite) + despliegue (FRONTEND_ORIGIN)
+_DEV_ORIGINS = (
+    "http://localhost:5173",  # npm run dev
+    "http://localhost:4173",  # vite preview
+    "http://localhost:8000",  # legado
+)
+REDIRECT_URIS = sorted(
+    {
+        f"{origin}{path}"
+        for origin in (*_DEV_ORIGINS, config.frontend_origin.rstrip("/"))
+        for path in ("/cuenta", "/admin")
+    }
+)
 
 ALL_SCOPES = ["profile", "email", "orders", "staff", "admin"]
 

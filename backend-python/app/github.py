@@ -153,8 +153,9 @@ async def github_callback(
     if row:  # el state es de un solo uso (se consume pase lo que pase)
         db.run("DELETE FROM github_login_states WHERE state = ?", state)
 
+    # El frontend ya no está en este origen: la vuelta debe apuntar a la SPA React
     def fail_redirect(msg: str):
-        return RedirectResponse(f"{target}#{urlencode({'error': msg})}", status_code=302)
+        return RedirectResponse(f"{config.frontend_origin}{target}#{urlencode({'error': msg})}", status_code=302)
 
     if error:
         return fail_redirect(error_description or error)
@@ -242,4 +243,4 @@ async def github_callback(
         "expires_in": str(tokens.get("expires_in", "")),
         "scope": scope,
     })
-    return RedirectResponse(f"{target}#{fragment}", status_code=302)
+    return RedirectResponse(f"{config.frontend_origin}{target}#{fragment}", status_code=302)
